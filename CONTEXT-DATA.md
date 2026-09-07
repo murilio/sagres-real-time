@@ -5,10 +5,10 @@ Atualizado: 2026-09-07
 ## Estado atual
 
 Projeto em planejamento. Nenhum código de aplicação existe: sem `package.json`, sem build, sem teste, sem banco.
-Repositório contém plano de arquitetura (`docs/plano.md`), guia para o Claude Code (`CLAUDE.md`) e três subagentes em `.claude/agents/`.
+Repositório contém plano de arquitetura (`docs/plano.md`), guia para o Claude Code (`CLAUDE.md`) e cinco subagentes em `.claude/agents/`.
 Fonte de dados verificada por acesso real em 2026-09-07: bucket S3 público do TCE-PB, listável, sem token, arquivos do ano corrente regerados diariamente ~03:00.
 Schemas dos quatro datasets (despesas, licitações, receitas, servidores) lidos de amostras baixadas — colunas confirmadas.
-Os três agentes estão implementados, **nenhum foi executado como subagente ainda (não verificado)** — definições em `.claude/agents/` só carregam na inicialização do Claude Code.
+Os cinco agentes (`context-keeper`, `committer`, `sonar-quality`, `backend-architect`, `frontend-architect`) estão implementados, **nenhum foi executado como subagente ainda (não verificado)** — definições em `.claude/agents/` só carregam na inicialização do Claude Code.
 
 ## Stack
 
@@ -27,6 +27,8 @@ Nada instalado. Planejado: Next.js (front), NestJS (API e worker), PostgreSQL, R
 
 ## Demandas
 
+- [2026-09-07] Criar quinto subagente de desenho de frontend → `frontend-architect` (174 linhas), cinco eixos (performance de carga e runtime separadas, escalabilidade, manutenibilidade, corretude de estado assíncrono, acessibilidade) → `.claude/agents/frontend-architect.md`, `CLAUDE.md`
+- [2026-09-07] Criar quarto subagente de desenho de backend → `backend-architect` (166 linhas), escopo dividido com `sonar-quality` (design vs. taxonomia de smell) → `.claude/agents/backend-architect.md`, `CLAUDE.md`
 - [2026-09-07] Trocar alvo do contexto para `CONTEXT-DATA.md` na raiz → rename em todas as referências + gatilho de fechamento reforçado → `.claude/agents/context-keeper.md`, `CLAUDE.md`
 - [2026-09-07] Criar agente de commit genérico → `committer` com agrupamento atômico e portões de segredo → `.claude/agents/committer.md`
 - [2026-09-07] Mover agentes para dentro do repositório → movidos de `~/.claude/agents/`, removidos do escopo de usuário
@@ -36,7 +38,7 @@ Nada instalado. Planejado: Next.js (front), NestJS (API e worker), PostgreSQL, R
 
 ## Pendências
 
-- [ ] Reiniciar o Claude Code para carregar os agentes de `.claude/agents/`
+- [ ] Reiniciar o Claude Code para carregar `frontend-architect` de `.claude/agents/`
 - [ ] Fase 0: parsear os 4 datasets do ano corrente, contar linhas reais, medir ocupação em Postgres
 - [ ] Validar o parser de número pt-BR contra totais conhecidos — `350.000` é ambíguo
 - [ ] Decidir Postgres puro versus Postgres + DuckDB após a medição da Fase 0
