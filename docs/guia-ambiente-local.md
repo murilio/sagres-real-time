@@ -6,7 +6,7 @@
 
 Passo a passo para deixar o Postgres local de pé, aplicar a migração e popular a dimensão `municipios`. Todos os comandos abaixo existem no repositório — conferidos no bloco `scripts` de `app/package.json`, que é o único manifesto do projeto.
 
-Este guia cobre apenas o que existe hoje: o banco, a dimensão `municipios` e o scaffold do Next.js. **Não há ingestão, API de dados nem motor de regras para rodar.**
+Este guia cobre apenas o que existe hoje: o banco, a dimensão `municipios` e o app Next.js com a tela inicial do painel. **Não há ingestão, API de dados nem motor de regras para rodar.**
 
 ## Diretório de trabalho
 
@@ -104,7 +104,17 @@ WHERE m.codigo_tce IS NULL;        -- nenhuma linha
 pnpm dev        # next dev
 ```
 
-O que existe hoje é o scaffold do App Router: `app/app/layout.tsx`, `app/app/page.tsx` e `app/app/globals.css`. Nenhuma tela do painel e nenhuma Route Handler foram escritas.
+O comando precisa ser executado com `app/` como diretório de trabalho, como todos os outros deste guia. Rodá-lo na raiz do repositório falha, porque não existe `package.json` na raiz. Em 2026-09-08 foi confirmado que tanto `pnpm dev` quanto `npm run dev` funcionam a partir de `app/`.
+
+O que existe hoje é a tela inicial do painel: um mapa da Paraíba, com imagens de fundo do OpenStreetMap, sem nenhum dado do banco plugado — ver [`referencia/tela-mapa-paraiba.md`](referencia/tela-mapa-paraiba.md). Nenhuma outra tela e nenhuma Route Handler foram escritas.
+
+### O Next.js 16 gera `AGENTS.md` e `CLAUDE.md`, e isso está desligado
+
+Por padrão, o Next.js 16 escreve automaticamente `AGENTS.md` e `CLAUDE.md` dentro de `app/` a cada `next dev` ou `next build`. Esses arquivos colidiriam com o `CLAUDE.md` real do projeto, que vive na raiz do repositório e carrega as convenções deste repositório: uma ferramenta que resolva o arquivo de instrução mais próximo do diretório de trabalho leria o gerado pelo Next.js em vez do verdadeiro.
+
+A geração está desligada pela flag `agentRules: false` em `app/next.config.ts:9`. Os dois arquivos gerados antes da flag foram apagados à mão em 2026-09-08, e foi confirmado que não voltam a aparecer depois de rodar `next dev` e `next build` com a flag ativa.
+
+Se você encontrar `app/AGENTS.md` ou `app/CLAUDE.md` no diretório de trabalho, não os edite nem os versione: apague-os e confira se a flag continua no `next.config.ts`.
 
 ## Recomeçar do zero
 

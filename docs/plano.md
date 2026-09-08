@@ -126,11 +126,13 @@ app/
     db.ts                 client Prisma — único ponto que instancia PrismaClient
     generated/prisma/     saída do `prisma generate`, não versionada
     seed/municipios.ts    seed da dimensão `municipios`
+    components/           componentes de tela
+      mapa-paraiba.tsx  mapa-paraiba-loader.tsx
   app/                    App Router
     layout.tsx  page.tsx  globals.css
 ```
 
-Isso é o estado atual, não um layout-alvo: o que existe é o banco com a dimensão `municipios` (contrato em [`referencia/dimensao-municipios.md`](referencia/dimensao-municipios.md)) e o scaffold do Next.js. **Ainda não existem** a Route Handler de ingestão, o motor de regras nem qualquer teste automatizado.
+Isso é o estado atual, não um layout-alvo: o que existe é o banco com a dimensão `municipios` (contrato em [`referencia/dimensao-municipios.md`](referencia/dimensao-municipios.md)) e a tela inicial do painel com o mapa da Paraíba, ainda sem dado plugado (contrato em [`referencia/tela-mapa-paraiba.md`](referencia/tela-mapa-paraiba.md)). **Ainda não existem** a Route Handler de ingestão, o motor de regras nem qualquer teste automatizado.
 
 Como o código cresce dentro do app único — onde ficam parsers de CSV, contratos de layout, tipos compartilhados e regras de negócio, hoje sem fronteira imposta pelo gerenciador de pacotes — é **A DEFINIR**. A convenção de diretórios ainda não foi decidida.
 
@@ -270,6 +272,8 @@ Telas do MVP:
 
 Server Components lendo o banco pelo client de `app/src/db.ts` ou consumindo as Route Handlers, gráficos com Recharts, tabelas virtualizadas para resultados grandes. Front e API são o mesmo aplicativo.
 
+**Implementado em 2026-09-08:** a tela inicial existe e mostra um mapa base do estado da Paraíba, em Leaflet com `react-leaflet` e imagens de fundo do OpenStreetMap. É só o mapa — não há contorno de município desenhado, nenhum dado do banco plugado e nenhum dos itens de conteúdo da Home listados acima (ranking de risco, feed de alertas, totais do estado). A escolha da biblioteca de mapa, a decisão de enquadrar por caixa delimitadora fixa em vez de ponto central com zoom, e a restrição do App Router que obriga o mapa a ser carregado por um Client Component intermediário estão em [`referencia/tela-mapa-paraiba.md`](referencia/tela-mapa-paraiba.md).
+
 ---
 
 ## 8. Roadmap
@@ -279,6 +283,8 @@ Server Components lendo o banco pelo client de `app/src/db.ts` ou consumindo as 
 **Fase 1 — Núcleo de dados (2 a 3 semanas).** Schema, migrações, ingestão diária consolidada com detecção de diferença, backfill de 2024–2026, API de leitura com filtros e paginação.
 
 **Fase 2 — Painel (2 semanas).** Telas de município, fornecedor e licitação. Busca global. Exportação.
+
+> Iniciada fora de ordem em 2026-09-08, antes das fases 0 e 1: a tela inicial ganhou o mapa base da Paraíba, sem dado nenhum plugado — ver seção 7 e [`referencia/tela-mapa-paraiba.md`](referencia/tela-mapa-paraiba.md). Nenhum outro item desta fase foi feito.
 
 **Fase 3 — Fiscalização (2 a 3 semanas).** Motor de regras, tabela de alertas, score de risco, watchlist e notificação por e-mail. É aqui que o produto deixa de ser um espelho do portal do TCE.
 
