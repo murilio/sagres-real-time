@@ -4,15 +4,32 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-Pre-implementation. The repository contains only planning material — there is no application code, package manifest, build, lint, or test setup yet. Do not invent commands for tooling that does not exist; when the first app is scaffolded, replace this section with the real commands.
+Early implementation. The repository root holds only documentation and agent configuration; **all application code lives under `app/`**, which is the root of a single Next.js application — `app/package.json`, `app/next.config.ts`, `app/prisma/`, `app/src/`, `app/docker-compose.yml`, `app/.env`. There is no monorepo, no pnpm workspace, and no separate backend service: Next.js Route Handlers are the API. Every `pnpm` and `docker compose` command has to run from `app/`, and every path in this file that names application code is relative to `app/` unless it starts with `docs/` or `.claude/`.
+
+What exists today: `app/prisma` (schema, the `municipios` migration) and `app/src` (Prisma client wrapper, the `municipios` seed, and the Next.js App Router under `app/app`). There is no ingestion route, no rules engine and no automated test suite yet — do not invent commands for tooling that does not exist.
+
+Commands that work today, all from `app/`:
+
+```bash
+pnpm install
+pnpm db:up                # docker compose up -d postgres
+pnpm typecheck
+pnpm prisma:migrate:dev
+pnpm seed                 # tsx src/seed/municipios.ts, no build step
+pnpm dev                  # next dev
+pnpm build                # prisma generate && next build
+pnpm db:psql
+```
+
+`DATABASE_POOL_MAX` (env, default 10) is the real pool cap read by `app/src/db.ts` — the old `connection_limit` query-string parameter on `DATABASE_URL` is a Prisma native-engine convention the `pg` driver adapter does not read, and setting it there does nothing.
 
 `docs/plano.md` is the source of truth for scope, architecture, data model, roadmap and risks. Read it before proposing structural changes.
 
 ## What this project is
 
-A watchdog application over the open data published by the Paraíba State Court of Accounts (TCE-PB) from its SAGRES system, covering expenses, procurements, revenues and payroll for all 223 municipalities of the state. Daily ingestion, public dashboard, and a rules engine that raises fiscalization signals.
+A watchdog application over the open data published by the Paraíba State Court of Accounts (TCE-PB) from its SAGRES system, covering expenses, procurements, revenues and payroll for all 223 municipalities of the state. Daily ingestion, public dashboard, and a rules engine that raises fiscalization signals. Built as a public study project — the architecture favors a single, easy-to-read codebase over the operational surface of a multi-service backend.
 
-Stack: Next.js (front), NestJS (API and worker), Prisma over PostgreSQL, Redis/BullMQ, pnpm workspaces monorepo (`apps/api`, `apps/worker`, `apps/web`, `packages/db`, `packages/shared`, `packages/ingest-core`). Prisma is the query path for the API and the dashboard only — the bulk ingestion path (staging load and merge of hundreds of MB per file) goes through raw SQL, and the year-partitioned tables need hand-written SQL migrations the Prisma schema cannot express.
+Stack: a single Next.js application at `app/` — App Router pages and Route Handlers as the API, Prisma over PostgreSQL, no separate backend framework and no queue. Prisma is the query path for the dashboard and for the API routes; the bulk ingestion path (staging load and merge of hundreds of MB per file) goes through raw SQL via the same `pg` pool, and the year-partitioned tables need hand-written SQL migrations the Prisma schema cannot express. Daily ingestion runs as a Route Handler (`app/app/api/ingest`, not built yet) guarded by a shared secret and invoked by an external cron (the deploy platform's scheduler, or a system cron hitting the URL) — there is no BullMQ/Redis queue and no separate worker process. See `docs/adr/ADR-0004-nextjs-unico.md` for why NestJS and the multi-package monorepo were dropped, and `docs/desenho-ingestao.md` for the recorded design guidance for that ingestion route (mutual exclusion via Postgres advisory lock, idempotency via the source's `ETag`, secret-header auth) — guidance only, not yet implemented, and still blocked on an undecided deploy target.
 
 The dashboard alone reproduces what TCE-PB already publishes. The rules engine and the change-history tracking are what make the product distinct — weight design decisions accordingly.
 
