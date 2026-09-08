@@ -15,7 +15,7 @@ importers:
         specifier: 7.10.0
         version: 7.10.0(prisma@7.10.0(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@5.9.3))(typescript@5.9.3)
       leaflet:
-        specifier: ^1.9.4
+        specifier: 1.9.4
         version: 1.9.4
       next:
         specifier: 16.3.4
@@ -30,11 +30,14 @@ importers:
         specifier: 19.2.8
         version: 19.2.8(react@19.2.8)
       react-leaflet:
-        specifier: ^5.0.0
+        specifier: 5.0.0
         version: 5.0.0(leaflet@1.9.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
     devDependencies:
+      '@types/geojson':
+        specifier: 7946.0.16
+        version: 7946.0.16
       '@types/leaflet':
-        specifier: ^1.9.22
+        specifier: 1.9.22
         version: 1.9.22
       '@types/node':
         specifier: 22.20.1

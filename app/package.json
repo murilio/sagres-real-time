@@ -23,7 +23,8 @@
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
     "prisma:validate": "prisma validate",
-    "seed": "tsx src/seed/municipios.ts"
+    "seed": "tsx src/seed/municipios.ts",
+    "geo:baixar": "tsx src/scripts/baixar-contornos-municipios.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.10.0",
@@ -36,6 +37,7 @@
     "react-leaflet": "5.0.0"
   },
   "devDependencies": {
+    "@types/geojson": "7946.0.16",
     "@types/leaflet": "1.9.22",
     "@types/node": "22.20.1",
     "@types/pg": "8.23.1",
