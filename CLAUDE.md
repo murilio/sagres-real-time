@@ -12,7 +12,7 @@ Pre-implementation. The repository contains only planning material — there is 
 
 A watchdog application over the open data published by the Paraíba State Court of Accounts (TCE-PB) from its SAGRES system, covering expenses, procurements, revenues and payroll for all 223 municipalities of the state. Daily ingestion, public dashboard, and a rules engine that raises fiscalization signals.
 
-Planned stack: Next.js (front), NestJS (API and worker), PostgreSQL, Redis/BullMQ, pnpm workspaces monorepo (`apps/api`, `apps/worker`, `apps/web`, `packages/db`, `packages/shared`, `packages/ingest-core`).
+Stack: Next.js (front), NestJS (API and worker), Prisma over PostgreSQL, Redis/BullMQ, pnpm workspaces monorepo (`apps/api`, `apps/worker`, `apps/web`, `packages/db`, `packages/shared`, `packages/ingest-core`). Prisma is the query path for the API and the dashboard only — the bulk ingestion path (staging load and merge of hundreds of MB per file) goes through raw SQL, and the year-partitioned tables need hand-written SQL migrations the Prisma schema cannot express.
 
 The dashboard alone reproduces what TCE-PB already publishes. The rules engine and the change-history tracking are what make the product distinct — weight design decisions accordingly.
 

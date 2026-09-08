@@ -105,7 +105,7 @@ apps/
   worker/     NestJS standalone — ingestão e motor de regras (BullMQ)
   web/        Next.js App Router — painel público
 packages/
-  db/         schema, migrações, client (Prisma ou Drizzle)
+  db/         schema, migrações, client (Prisma — ver docs/adr/ADR-0001-nextjs-nestjs-prisma.md)
   shared/     tipos, DTOs, schemas de validação (zod)
   ingest-core/ parsers de CSV, normalizadores, contratos de layout
 ```
