@@ -5,7 +5,7 @@ import "leaflet/dist/leaflet.css";
 import { useEffect, useState } from "react";
 import { GeoJSON, MapContainer, TileLayer } from "react-leaflet";
 import type { GeoJsonObject } from "geojson";
-import type { LatLngBoundsExpression, PathOptions } from "leaflet";
+import type { Layer, LatLngBoundsExpression, Path, PathOptions } from "leaflet";
 
 // Bounding box da Paraiba (SW, NE), com folga suficiente para o estado
 // inteiro caber no enquadramento inicial do mapa.
@@ -24,16 +24,50 @@ type PropriedadesContorno =
   | { tipo: "estado"; codigo_uf: string; nome: string }
   | { tipo: "municipio"; codigo_tce: string; codigo_ibge: string; nome: string };
 
+// Preenchimento uniforme por enquanto — clarinho em repouso, mais
+// escuro no hover. Colorir por indicador (mapa coropletico) e o
+// proximo passo natural, quando houver dado de fiscalizacao por
+// municipio para mapear em cor; a paleta muda, a mecanica de
+// hover/tooltip abaixo nao.
+const COR_MUNICIPIO = "#93c5fd";
+const COR_MUNICIPIO_HOVER = "#2563eb";
+
 function estiloContorno(
   feature?: GeoJSON.Feature<GeoJSON.Geometry, PropriedadesContorno>,
 ): PathOptions {
   if (feature?.properties.tipo === "estado") {
     return { color: "#1d4ed8", weight: 2, fill: false };
   }
-  // Sem preenchimento por enquanto: colorir por indicador (mapa
-  // coropletico) e o proximo passo natural, quando houver dado de
-  // fiscalizacao por municipio para mapear em cor.
-  return { color: "#64748b", weight: 1, fillOpacity: 0 };
+  return {
+    color: "#475569",
+    weight: 1,
+    fillColor: COR_MUNICIPIO,
+    fillOpacity: 0.45,
+  };
+}
+
+function aoMontarFeature(
+  feature: GeoJSON.Feature<GeoJSON.Geometry, PropriedadesContorno>,
+  layer: Layer,
+): void {
+  if (feature.properties.tipo !== "municipio") {
+    return;
+  }
+
+  layer.bindTooltip(feature.properties.nome, { sticky: true });
+
+  layer.on("mouseover", () => {
+    (layer as Path).setStyle({
+      fillColor: COR_MUNICIPIO_HOVER,
+      fillOpacity: 0.7,
+    });
+  });
+  layer.on("mouseout", () => {
+    (layer as Path).setStyle({
+      fillColor: COR_MUNICIPIO,
+      fillOpacity: 0.45,
+    });
+  });
 }
 
 export function MapaParaiba() {
@@ -71,6 +105,9 @@ export function MapaParaiba() {
           key="contornos-paraiba"
           data={contornos}
           style={estiloContorno as (feature?: GeoJSON.Feature) => PathOptions}
+          onEachFeature={
+            aoMontarFeature as (feature: GeoJSON.Feature, layer: Layer) => void
+          }
         />
       )}
     </MapContainer>
