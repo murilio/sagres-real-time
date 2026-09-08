@@ -4,13 +4,10 @@ Atualizado: 2026-09-08
 
 ## Estado atual
 
-Pivot de arquitetura nesta sessão: era monorepo pnpm com NestJS API + NestJS worker (BullMQ/Redis) + Next.js web; agora é **um único app Next.js** (`app/`), decisão explícita do usuário — projeto de estudo e público. `app/` deixou de ser raiz de monorepo: sem `apps/`, `packages/`, `pnpm-workspace.yaml`, sem pacotes `@sagres/*`.
-Layout atual de `app/`: `package.json` único (`sagres-real-time`), `prisma/` (schema, migração `20260908122955_init_municipios`, seed CSV), `src/` (`db.ts`, `generated/prisma/` gitignored, `seed/municipios.ts`), `app/` App Router (`layout.tsx`, `page.tsx`, `globals.css`).
-Verificado por execução após o pivot, todos sem `--filter`: `pnpm install`, `pnpm prisma:generate`, `pnpm typecheck` (limpo), `pnpm prisma:migrate:deploy` (sem pendência), `pnpm seed` (223 linhas, idempotente), `pnpm build` (`next build` ok, rota `/` estática). Banco intacto, 223 municípios.
-Bug corrigido nesta sessão (achado do `backend-architect`): `connection_limit` na query string de `DATABASE_URL` é do engine nativo do Prisma, driver `pg` do adapter não lê — pool sempre usava `max` default do `pg` (10). Corrigido com env `DATABASE_POOL_MAX` lida em `app/src/db.ts` e passada como `max` ao `pg.Pool`.
-Plataforma de deploy indefinida por decisão do usuário — fica `A DEFINIR` em `docs/adr/ADR-0004-nextjs-unico.md` e `docs/desenho-ingestao.md`; trava o desenho fino da rota de ingestão.
-Route Handler de ingestão não existe ainda — só orientação de desenho registrada em `docs/desenho-ingestao.md`.
-**Nada commitado**: `app/` inteiro untracked; uma tentativa de commit do `committer` no início da sessão falhou por rate limit antes de criar qualquer commit, sem dano.
+App Next.js único (`app/`) com Prisma embutido, decisão de pivot já commitada. Rota `/` mostra tela inicial do painel: cabeçalho + mapa Leaflet (`react-leaflet`) enquadrando a Paraíba via `bounds`, ocupando `100dvh`. Verificado por execução: `pnpm typecheck` limpo, `pnpm build` ok, teste visual no navegador (zoom/pan ok, Paraíba enquadrada).
+`next.config.ts` tem `agentRules: false` — Next 16 gera `app/AGENTS.md`/`app/CLAUDE.md` automaticamente e colidia com o `CLAUDE.md` real da raiz; confirmado que não reaparecem.
+Route Handler de ingestão não existe ainda — só orientação de desenho em `docs/desenho-ingestao.md`. Plataforma de deploy segue `A DEFINIR` por decisão do usuário.
+Mudanças do mapa **não commitadas**: diff em `app/app/page.tsx`, `app/app/globals.css`, `app/next.config.ts`, `app/package.json`, `app/pnpm-lock.yaml`, `app/next-env.d.ts`, mais untracked `app/src/components/`.
 Nenhum teste automatizado no repositório. Os sete agentes em `.claude/agents/` seguem implementados.
 
 ## Stack
@@ -38,9 +35,12 @@ Node 22.18.0, pnpm 10.34.5 (fixado, ver Becos), TypeScript 5.9.3, Next.js (App R
 - [2026-09-08] Pivot de monorepo (NestJS API + worker BullMQ/Redis + Next.js web) para app Next.js único com Prisma embutido — pedido explícito do usuário, projeto de estudo e público.
 - [2026-09-08] Nova env `DATABASE_POOL_MAX` (default 10) para controlar o pool do `pg.Pool` explicitamente — `connection_limit` na URL não é lido pelo driver `pg` do adapter.
 - [2026-09-08] Plataforma de deploy fica em aberto por decisão do usuário — registrado como `A DEFINIR` em vez de escolhida por default.
+- [2026-09-08] `agentRules: false` em `app/next.config.ts` — Next 16 gera `app/AGENTS.md`/`app/CLAUDE.md` a cada dev/build, colidindo com o `CLAUDE.md` real da raiz do repositório.
+- [2026-09-08] `mapa-paraiba-loader.tsx` separado de `mapa-paraiba.tsx` para isolar o `next/dynamic(..., { ssr: false })` — Server Component não aceita `ssr: false` direto no App Router do Next 16.
 
 ## Demandas
 
+- [2026-09-08] Criar a tela inicial do painel, "mapa de leaflet com foco no estado da paraiba" → `mapa-paraiba.tsx` (`react-leaflet`, `bounds` da PB) + `mapa-paraiba-loader.tsx` (`next/dynamic` `ssr:false`), `page.tsx` e `globals.css` ajustados para o layout de tela cheia, `leaflet`/`react-leaflet`/`@types/leaflet` fixados em `package.json`; achado de tooling corrigido (`agentRules: false`); suporte ao usuário sobre `npm run dev` não rodando na raiz (não confirmado se resolveu); `documenter` despachado em paralelo para `docs/`, resultado ainda não visto por este registro; nada commitado → `app/src/components/mapa-paraiba.tsx`, `app/src/components/mapa-paraiba-loader.tsx`, `app/app/page.tsx`, `app/app/globals.css`, `app/next.config.ts`, `app/package.json`
 - [2026-09-08] Pivot de monorepo NestJS+Next.js para app único Next.js, "usar apenas o nextjs, com a API no nextjs usando o prisma" → `app/` reestruturado sem `apps/`/`packages/`/workspace, bug de `connection_limit` no pool corrigido com `DATABASE_POOL_MAX`, `pnpm install/typecheck/migrate/seed/build` verificados por execução, 223 municípios intactos, ADR-0004 e `docs/desenho-ingestao.md` novos, ADR-0001/ADR-0003 marcadas superadas na parte de arquitetura, `docs/plano.md` e demais docs reescritos, `CLAUDE.md` atualizado → `app/package.json`, `app/src/db.ts`, `app/.env`, `app/.env.example`, `docs/adr/ADR-0004-nextjs-unico.md`, `docs/desenho-ingestao.md`, `docs/plano.md`, `docs/guia-ambiente-local.md`, `docs/referencia/dimensao-municipios.md`, `docs/referencia/layout-csv-sagres.md`, `docs/procedencia-municipios.md`, `docs/README.md`, `CLAUDE.md`
 - [2026-09-08] Mover o monorepo pnpm para dentro de `app/` e deixar o ambiente funcionando de novo → `pnpm install` a partir de `app/` reparou a instalação quebrada pelo move, lockfile passou a listar `next`, projeto Compose fixado em `sagres-real-time`, container antigo recriado sob o novo nome sem perda do volume (223 municípios intactos), `.gitignore` e `CLAUDE.md` atualizados, docs revisados pelo `documenter` → `app/docker-compose.yml`, `CLAUDE.md`, `.gitignore`, `docs/guia-ambiente-local.md`, `docs/plano.md`, `docs/referencia/dimensao-municipios.md`, `docs/referencia/layout-csv-sagres.md`, `docs/procedencia-municipios.md`, `docs/README.md`, `docs/adr/ADR-0001-nextjs-nestjs-prisma.md`, `docs/adr/ADR-0002-dimensao-municipios.md`, `docs/adr/ADR-0003-prisma-7-driver-adapter.md`
 - [2026-09-08] Criar primeira tabela do back — dimensão `municipios` da PB com `tcecode` → schema Prisma + migração + seed em `packages/db`, monorepo pnpm scaffolded, 6 docs novos/atualizados; 223 linhas verificadas no banco, idempotência do seed verificada por execução dupla; nada commitado → `packages/db/prisma/schema.prisma`, `packages/db/prisma/migrations/20260908122955_init_municipios/migration.sql`, `packages/db/prisma/seed/municipios-tce-pb.csv`, `packages/db/src/seed/municipios.ts`, `docs/referencia/dimensao-municipios.md`, `docs/procedencia-municipios.md`, `docs/adr/ADR-0002-dimensao-municipios.md`, `docs/adr/ADR-0003-prisma-7-driver-adapter.md`
@@ -70,6 +70,8 @@ Node 22.18.0, pnpm 10.34.5 (fixado, ver Becos), TypeScript 5.9.3, Next.js (App R
 - [ ] Escrever a Route Handler de ingestão — só existe orientação de desenho em `docs/desenho-ingestao.md`, nenhum código ainda
 - [ ] Decidir se adota `no-restricted-imports` (ou equivalente) para impor a fronteira `domain/application/infra` em `app/src` — achado do `backend-architect`, sem barreira física de pacote depois do pivot
 - [ ] Definir estratégia de migração em produção e fonte para `codigo_ibge` (não existe no TCE-PB)
+- [ ] Confirmar com o usuário se rodar `npm run dev` a partir de `app/` (em vez da raiz) resolveu o problema relatado
+- [ ] Commitar a tela inicial (mapa Leaflet) — diff em `app/` ainda não passou pelo `committer`
 
 ## Becos sem saída
 
