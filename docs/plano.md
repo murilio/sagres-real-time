@@ -1,8 +1,12 @@
 # Plano — Monitor SAGRES TCE-PB
 
+> **Estado:** vigente
+> **Atualizado:** 2026-09-08
+> **Público:** quem precisa entender o projeto inteiro antes de mexer em qualquer parte
+
 Aplicação de fiscalização externa (watchdog) sobre os dados abertos do SAGRES do Tribunal de Contas do Estado da Paraíba. Coleta diária, painel público e motor de alertas sobre despesas, licitações, receitas e folha de pagamento dos 223 municípios paraibanos.
 
-Stack definida: Next.js no front, NestJS na API.
+Stack definida: um único aplicativo Next.js (App Router), com a API em Route Handlers e Prisma sobre PostgreSQL — ver [`adr/ADR-0004-nextjs-unico.md`](adr/ADR-0004-nextjs-unico.md).
 
 ---
 
@@ -47,20 +51,23 @@ Existe também a **SAGRES Captura API** (`https://sagrescaptura.tce.pb.gov.br/ap
 
 ### Esquemas reais dos CSVs
 
-**despesas** (36 colunas, granularidade de empenho):
+Os cabeçalhos abaixo são os das versões correntes (2026). **O layout não é estável entre anos dentro do mesmo dataset** — `despesas` e `servidores` têm duas versões de cabeçalho cada. O contrato exato, por dataset e por faixa de anos, com o método de verificação, está em [`referencia/layout-csv-sagres.md`](referencia/layout-csv-sagres.md). Quem for escrever o parser deve usar aquele documento, não este.
+
+**despesas** (40 colunas, granularidade de empenho) — versão 2020–2026:
 
 ```
-nome_municipio; codigo_unidade_gestora; descricao_unidade_gestora; numero_empenho;
+municipio; codigo_unidade_gestora; descricao_unidade_gestora; numero_empenho;
 data_empenho; mes; cpf_cnpj; nome_credor; valor_empenhado; valor_liquidado; valor_pago;
 codigo_unidade_orcamentaria; descricao_unidade_orcamentaria; codigo_funcao; funcao;
 codigo_subfuncao; subfuncao; codigo_programa; programa; codigo_acao; acao;
 codigo_categoria_economica; categoria_economica; codigo_natureza; grupo_natureza_despesa;
 codigo_modalidade_aplicacao; modalidade_aplicacao; codigo_elemento_despesa; elemento_despesa;
 codigo_subelemento; codigo_subelemento_exibicao; numero_licitacao; modalidade_licitacao;
-numero_obra; historico; codigo_fonte
+numero_obra; historico; codigo_fonte_recurso; descricao_fonte_recurso; ano_fonte;
+co; descricao_co
 ```
 
-**licitacoes** (uma linha por proponente de cada certame):
+**licitacoes** (13 colunas, uma linha por proponente de cada certame) — cabeçalho único de 2015 a 2026:
 
 ```
 nome_municipio; codigo_unidade_gestora; descricao_unidade_gestora; numero_licitacao;
@@ -68,7 +75,7 @@ numero_protocolo_tce; ano_licitacao; modalidade; objeto_licitacao; data_homologa
 nome_proponente; cpf_cnpj_proponente; valor_ofertado; situacao_proposta
 ```
 
-**receitas** (agregado mensal):
+**receitas** (13 colunas, agregado mensal) — cabeçalho único de 2003 a 2026:
 
 ```
 municipio; codigo_unidade_gestora; descricao_unidade_gestora; mes_ano; ano;
@@ -76,7 +83,7 @@ codigo_receita; descricao_receita; tipo_atualizacao_receita; valor;
 codigo_fonte_recurso; descricao_fonte_recurso; co; descricao_co
 ```
 
-**servidores** (folha mensal):
+**servidores** (11 colunas, folha mensal) — versão 2020–2026; nos anos de 2013 a 2019 a primeira coluna chama-se `municipio`, não `nome_municipio`:
 
 ```
 nome_municipio; codigo_unidade_gestora; descricao_unidade_gestora; cpf_cnpj;
@@ -90,40 +97,62 @@ matricula; ano_mes
 2. **Os arquivos são snapshots completos, não incrementos.** Cada carga diária substitui o arquivo do ano. O "novo" precisa ser derivado por diferença contra o estado anterior no banco.
 3. **CPF de servidor vem mascarado** (`***.539.694-**`). Cruzamento entre folha e credores só é possível por nome e matrícula, com risco de homônimo. O CNPJ/CPF de credores e proponentes vem completo, o que viabiliza análise de rede de fornecedores.
 4. **Correções retroativas.** Prefeituras retificam remessas de anos anteriores. Monitorar só o ano corrente perde essas correções — que, aliás, são um sinal de fiscalização interessante por si só.
-5. **Contrato de layout não é garantido.** Colunas podem mudar sem aviso. A ingestão precisa validar o cabeçalho a cada execução e falhar de forma ruidosa.
-6. **Formato numérico ambíguo em valores redondos.** `350.000` pode ser trezentos e cinquenta mil ou trezentos e cinquenta com três decimais. A regra pt-BR (`.` = milhar, `,` = decimal) resolve na teoria, mas precisa ser validada contra totais conhecidos antes de confiar nos números.
+5. **Contrato de layout não é garantido — e já mudou.** Não é hipótese: `despesas` tem duas versões de cabeçalho (2003–2019 e 2020–2026) com o mesmo número de colunas e nomes diferentes, e `servidores` tem duas (2013–2019 e 2020–2026). Validar só a contagem de campos aceita o arquivo antigo em silêncio e grava o valor certo com o rótulo errado. A ingestão precisa validar a lista de nomes inteira a cada execução e falhar de forma ruidosa. Detalhe em [`referencia/layout-csv-sagres.md`](referencia/layout-csv-sagres.md).
+6. **O CSV não é orientado a linha.** Campos entre aspas contêm quebra de linha embutida (observado em `descricao_receita`). Dividir o arquivo por `\n` corrompe registros — na coleta de 2026-09-08 isso produziu falsos nomes de município em 6 dos 223 códigos. O parser precisa ser RFC 4180. Há também byte NUL dentro de pelo menos um arquivo (`116/despesas/despesas-2025.csv`, 13 bytes `0x00`), que aborta leitores estritos e é rejeitado pelo `COPY` do Postgres em coluna `text`.
+7. **O nome do município dentro do CSV não é confiável.** Diverge entre datasets em 3 dos 223 códigos e, no código `190`, aponta para o município errado em 22 anos de arquivos de `receitas`, por defeito de publicação do TCE-PB. Município se resolve pelo código do caminho ou pelos 3 últimos dígitos de `codigo_unidade_gestora`, nunca pelo campo de nome. Evidência em [`procedencia-municipios.md`](procedencia-municipios.md).
+8. **Formato numérico ambíguo em valores redondos.** `350.000` pode ser trezentos e cinquenta mil ou trezentos e cinquenta com três decimais. A regra pt-BR (`.` = milhar, `,` = decimal) resolve na teoria, mas precisa ser validada contra totais conhecidos antes de confiar nos números.
 
 ---
 
 ## 2. Arquitetura
 
-Monorepo com pnpm workspaces:
+**Um único aplicativo Next.js com App Router.** Não há monorepo, não há NestJS e não há Redis/BullMQ. A API são Route Handlers do próprio Next.js, e a ingestão diária é uma Route Handler protegida por segredo compartilhado, acionada por um cron externo (Vercel Cron ou cron de sistema). A decisão, sua motivação e o que ela substitui estão em [`adr/ADR-0004-nextjs-unico.md`](adr/ADR-0004-nextjs-unico.md).
+
+Todo o código vive na pasta `app/` do repositório — `package.json`, `pnpm-lock.yaml`, `docker-compose.yml`, `.env`, `next.config.ts` e `tsconfig.json` ficam lá, e todo comando `pnpm` ou `docker compose` roda com `app/` como diretório de trabalho. `docs/`, `README.md`, `CLAUDE.md`, `CONTEXT-DATA.md`, `.gitignore` e `.claude/` continuam na raiz do repositório.
+
+Estrutura existente em 2026-09-08, verificada no disco:
 
 ```
-apps/
-  api/        NestJS — REST, autenticação, consultas, alertas
-  worker/     NestJS standalone — ingestão e motor de regras (BullMQ)
-  web/        Next.js App Router — painel público
-packages/
-  db/         schema, migrações, client (Prisma — ver docs/adr/ADR-0001-nextjs-nestjs-prisma.md)
-  shared/     tipos, DTOs, schemas de validação (zod)
-  ingest-core/ parsers de CSV, normalizadores, contratos de layout
+app/
+  package.json          manifesto único, name "sagres-real-time"
+  next.config.ts  tsconfig.json  prisma.config.ts
+  docker-compose.yml
+  .env  .env.example  .nvmrc  .npmrc
+  prisma/
+    schema.prisma
+    migrations/20260908122955_init_municipios/
+    seed/municipios-tce-pb.csv
+  src/
+    db.ts                 client Prisma — único ponto que instancia PrismaClient
+    generated/prisma/     saída do `prisma generate`, não versionada
+    seed/municipios.ts    seed da dimensão `municipios`
+  app/                    App Router
+    layout.tsx  page.tsx  globals.css
 ```
 
-Justificativa de separar `worker` de `api`: a ingestão consome CPU e memória de forma intensa por alguns minutos por dia (descompactar e parsear centenas de MB). Deixar isso no mesmo processo que serve requisições degrada a latência do painel. Compartilham `packages/db` e `packages/ingest-core`.
+Isso é o estado atual, não um layout-alvo: o que existe é o banco com a dimensão `municipios` (contrato em [`referencia/dimensao-municipios.md`](referencia/dimensao-municipios.md)) e o scaffold do Next.js. **Ainda não existem** a Route Handler de ingestão, o motor de regras nem qualquer teste automatizado.
+
+Como o código cresce dentro do app único — onde ficam parsers de CSV, contratos de layout, tipos compartilhados e regras de negócio, hoje sem fronteira imposta pelo gerenciador de pacotes — é **A DEFINIR**. A convenção de diretórios ainda não foi decidida.
+
+### Ingestão sem worker separado
+
+A arquitetura anterior separava um processo `worker` da API porque a ingestão consome CPU e memória de forma intensa por alguns minutos por dia, e executá-la junto do atendimento de requisições degrada a latência do painel. Essa restrição não desapareceu; a separação de processos, sim. O custo foi assumido conscientemente ao trocar por uma base de código única (ADR-0004, "Consequências").
+
+Em 2026-09-08 uma revisão de arquitetura de backend produziu orientações de desenho para essa ingestão — onde ela executa, como duas execuções são impedidas de se atropelar e como o endpoint de gatilho é protegido. Elas estão em [`desenho-ingestao.md`](desenho-ingestao.md) e são **orientação a seguir quando o código for escrito, não decisão fechada**: nada foi implementado e não há ADR própria. O ponto de arquitetura que sai de lá: o trabalho pesado não roda dentro da Route Handler em nenhum cenário — ela é um gatilho fino que registra a execução e responde `202`, e o processamento fica num binário chamado diretamente pelo cron.
+
+**A DEFINIR: a plataforma de deploy**, e com ela o ramo de execução da ingestão. Perguntado em 2026-09-08, o usuário respondeu que ainda não está decidido. As orientações de proteção do endpoint e de exclusão mútua não dependem dessa escolha; as de tempo de execução, sim.
 
 ### Infraestrutura
 
 - **PostgreSQL 16** — banco principal, com particionamento por ano nas tabelas grandes
-- **Redis** — filas BullMQ
 - **Object storage** (opcional) — guardar os ZIPs baixados para reprocessamento sem rebaixar da fonte
-- **Deploy** — web na Vercel; API e worker em contêiner (Fly.io, Railway ou VPS com Docker Compose)
+- **Deploy** — um artefato só, o app Next.js. A plataforma é **A DEFINIR** por resposta explícita do usuário em 2026-09-08; a escolha está acoplada ao limite de duração de execução da rota de ingestão ([`desenho-ingestao.md`](desenho-ingestao.md), seção 1).
 
----
+Redis deixou de fazer parte do dimensionamento: não há fila BullMQ.
 
 ## 3. Pipeline de ingestão
 
-Cron diário às 07:00 UTC (uma hora após a janela de regeneração do TCE).
+Cron externo diário às 07:00 UTC (uma hora após a janela de regeneração do TCE), acionando a ingestão — ver seção 2, "Ingestão sem worker separado", e [`desenho-ingestao.md`](desenho-ingestao.md) para as orientações de desenho e para o que ainda está em aberto.
 
 ```
 1. HEAD nos 4 arquivos consolidados do ano corrente
@@ -158,7 +187,7 @@ Cron diário às 07:00 UTC (uma hora após a janela de regeneração do TCE).
 
 ### Dimensões
 
-`municipios`, `unidades_gestoras`, `unidades_orcamentarias`, `fornecedores` (chave `cpf_cnpj`, com `raiz_cnpj` de 8 dígitos derivada para agrupar matriz/filial), `naturezas_despesa`, `funcoes`, `subfuncoes`, `programas`, `acoes`, `fontes_recurso`, `codigos_receita`, `cargos`
+`municipios` (**única existente hoje** — contrato em [`referencia/dimensao-municipios.md`](referencia/dimensao-municipios.md), modelagem em [`adr/ADR-0002-dimensao-municipios.md`](adr/ADR-0002-dimensao-municipios.md)), `unidades_gestoras`, `unidades_orcamentarias`, `fornecedores` (chave `cpf_cnpj`, com `raiz_cnpj` de 8 dígitos derivada para agrupar matriz/filial), `naturezas_despesa`, `funcoes`, `subfuncoes`, `programas`, `acoes`, `fontes_recurso`, `codigos_receita`, `cargos`
 
 ### Fatos
 
@@ -215,19 +244,19 @@ Ponto importante de produto: a interface precisa ser explícita de que um alerta
 
 ---
 
-## 6. API (NestJS)
+## 6. API (Route Handlers do Next.js)
 
-Módulos: `auth`, `municipios`, `unidades-gestoras`, `despesas`, `licitacoes`, `receitas`, `servidores`, `fornecedores`, `alertas`, `watchlist`, `busca`, `export`, `admin-ingest`.
+Áreas de endpoint: `auth`, `municipios`, `unidades-gestoras`, `despesas`, `licitacoes`, `receitas`, `servidores`, `fornecedores`, `alertas`, `watchlist`, `busca`, `export`, `admin-ingest`.
 
 - Paginação por cursor em todos os endpoints de listagem
 - Filtros combináveis: município, UG, ano, faixa de datas, natureza, elemento, credor, faixa de valor
-- Leitura pesada e dado imutável até a próxima carga diária → cache agressivo no Redis com invalidação no fim de cada ingestão
+- Leitura pesada e dado imutável até a próxima carga diária → cache agressivo com invalidação no fim de cada ingestão. **A DEFINIR:** qual camada de cache, agora que não há Redis no dimensionamento — cache do próprio Next.js, materialized views ou outra coisa.
 - Endpoints de agregação servidos pelas materialized views, nunca por `SUM()` sobre a tabela fato
 - Exportação CSV/JSON de qualquer consulta, com a mesma licença de dado aberto da fonte
 
 ---
 
-## 7. Front (Next.js)
+## 7. Front
 
 Telas do MVP:
 
@@ -239,7 +268,7 @@ Telas do MVP:
 - **Busca global** — full text sobre histórico de empenho e objeto de licitação
 - **Watchlist** — usuário acompanha município, UG ou fornecedor e recebe alertas por e-mail
 
-Server Components consumindo a API, gráficos com Recharts, tabelas virtualizadas para resultados grandes.
+Server Components lendo o banco pelo client de `app/src/db.ts` ou consumindo as Route Handlers, gráficos com Recharts, tabelas virtualizadas para resultados grandes. Front e API são o mesmo aplicativo.
 
 ---
 
@@ -274,3 +303,5 @@ Server Components consumindo a API, gráficos com Recharts, tabelas virtualizada
 ## 10. Primeira decisão a tomar
 
 Rodar a Fase 0 antes de escrever qualquer linha de schema. O número de linhas reais e o tamanho ocupado em Postgres determinam se o histórico completo cabe no plano ou se o projeto começa com três anos. Tudo depois disso depende dessa medida.
+
+**Nota de 2026-09-08.** Essa ordem não foi seguida à risca: a dimensão `municipios` foi modelada e populada antes da Fase 0. A exceção se justifica porque `municipios` é uma dimensão fechada de 223 linhas, cujo dimensionamento não depende de nenhuma medição de volume. A recomendação continua valendo para as tabelas de fato, que são as que o dimensionamento decide.
