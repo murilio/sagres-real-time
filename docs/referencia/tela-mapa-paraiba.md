@@ -6,7 +6,7 @@
 
 Contrato da primeira tela do painel: qual biblioteca de mapa foi escolhida, de onde vêm as imagens de fundo (*tiles*), de onde vêm os contornos do estado e dos 223 municípios, como o enquadramento inicial no estado da Paraíba é definido, e a restrição do App Router do Next.js que obriga o mapa a ser carregado por um arquivo intermediário. A definição autoritativa é o código; este documento explica as decisões que o código sozinho não conta.
 
-O que existe hoje é o **mapa base mais os contornos**: as imagens de fundo do OpenStreetMap enquadradas na Paraíba, com zoom e deslocamento (*pan*) funcionando, e por cima delas o contorno do estado e o contorno de cada um dos 223 municípios, desenhados a partir de um arquivo GeoJSON estático versionado no repositório. **Não há dado do banco plugado no mapa** e não há interação além da navegação do próprio mapa: os contornos são apenas linhas, sem preenchimento por cor e sem clique.
+O que existe hoje é o **mapa base mais os contornos**: as imagens de fundo do OpenStreetMap enquadradas na Paraíba, com zoom e deslocamento (*pan*) funcionando, e por cima delas o contorno do estado e o contorno de cada um dos 223 municípios, desenhados a partir de um arquivo GeoJSON estático versionado no repositório. Cada município é preenchido com uma cor uniforme e reage ao passar do mouse, com um rótulo flutuante (*tooltip*) mostrando o nome. **Não há dado do banco plugado no mapa** e não há clique: o preenchimento é a mesma cor para os 223 municípios, não representa nenhum indicador.
 
 ## Arquivos
 
@@ -34,15 +34,15 @@ Adicionadas a `app/package.json` com versão exata, sem `^`, seguindo a convenç
 
 ## Stack de mapa
 
-**Leaflet com o invólucro `react-leaflet`, e imagens de fundo do OpenStreetMap.** A combinação não exige chave de API, cadastro nem cartão de crédito: as URLs de *tile* do OpenStreetMap (`https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png`, em `app/src/components/mapa-paraiba.tsx:24`) são públicas, o que mantém o projeto executável por qualquer pessoa que clone o repositório sem precisar provisionar conta em serviço de mapas.
+**Leaflet com o invólucro `react-leaflet`, e imagens de fundo do OpenStreetMap.** A combinação não exige chave de API, cadastro nem cartão de crédito: as URLs de *tile* do OpenStreetMap (`https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png`, em `app/src/components/mapa-paraiba.tsx:101`) são públicas, o que mantém o projeto executável por qualquer pessoa que clone o repositório sem precisar provisionar conta em serviço de mapas.
 
-A atribuição ao OpenStreetMap é obrigatória pela licença dos dados e está no `TileLayer` (`app/src/components/mapa-paraiba.tsx:22-25`). Ela não pode ser removida da tela.
+A atribuição ao OpenStreetMap é obrigatória pela licença dos dados e está no `TileLayer` (`app/src/components/mapa-paraiba.tsx:99-102`). Ela não pode ser removida da tela.
 
 **A DEFINIR:** o uso de *tiles* do servidor público do OpenStreetMap está sujeito à política de uso dessa organização, que restringe tráfego de aplicação em produção. Não foi verificado nesta sessão se o volume esperado do painel cabe nessa política, nem qual provedor de *tiles* seria usado em produção.
 
 ## Enquadramento: `bounds`, não `center` + `zoom`
 
-O `MapContainer` recebe `bounds` com uma caixa delimitadora fixa da Paraíba — canto sudoeste `[-8.32, -38.8]` e canto nordeste `[-6.0, -34.7]` — em `app/src/components/mapa-paraiba.tsx:10-13`. A caixa tem folga sobre o contorno real do estado, de modo que o estado inteiro cabe no enquadramento inicial.
+O `MapContainer` recebe `bounds` com uma caixa delimitadora fixa da Paraíba — canto sudoeste `[-8.32, -38.8]` e canto nordeste `[-6.0, -34.7]` — em `app/src/components/mapa-paraiba.tsx:12-15`. A caixa tem folga sobre o contorno real do estado, de modo que o estado inteiro cabe no enquadramento inicial.
 
 A alternativa seria fixar um ponto central mais um nível de zoom. Ela foi descartada porque um par `center` + `zoom` só enquadra corretamente em uma proporção de tela: o mesmo zoom que mostra o estado inteiro em um monitor largo corta as pontas em uma janela estreita ou em telefone. Com `bounds`, o Leaflet calcula o zoom que faz a caixa caber no contêiner disponível, e o enquadramento se mantém correto em qualquer tamanho de tela.
 
@@ -80,7 +80,7 @@ O parâmetro `qualidade` controla o nível de detalhe do polígono. Foi fixado e
 
 O contorno isolado do estado, em `intermediaria`, ocupa 7,2 KB. O arquivo final gravado tem 215.739 bytes.
 
-O IBGE exige atribuição para reuso da malha. Ela aparece em dois lugares: no campo `fonte` na raiz do próprio GeoJSON, junto do dado, e no controle de atribuição do mapa, somada à do OpenStreetMap (`app/src/components/mapa-paraiba.tsx:66`), que na tela aparece como `OpenStreetMap — contornos: IBGE`.
+O IBGE exige atribuição para reuso da malha. Ela aparece em dois lugares: no campo `fonte` na raiz do próprio GeoJSON, junto do dado, e no controle de atribuição do mapa, somada à do OpenStreetMap (`app/src/components/mapa-paraiba.tsx:100`), que na tela aparece como `OpenStreetMap — contornos: IBGE`.
 
 ### Por que não o Nominatim
 
@@ -128,16 +128,33 @@ O tipo das propriedades está declarado em `app/src/components/mapa-paraiba.tsx:
 
 ## Desenho dos contornos na tela
 
-O componente busca o GeoJSON no navegador, depois da montagem, com `fetch` dentro de um `useEffect` (`app/src/components/mapa-paraiba.tsx:42-57`), e só renderiza a camada `<GeoJSON>` do `react-leaflet` quando o arquivo chega. A camada fica por cima do `TileLayer`.
+O componente busca o GeoJSON no navegador, depois da montagem, com `fetch` dentro de um `useEffect` (`app/src/components/mapa-paraiba.tsx:76-91`), e só renderiza a camada `<GeoJSON>` do `react-leaflet` quando o arquivo chega. A camada fica por cima do `TileLayer`.
 
-O estilo é decidido por *feature*, pela propriedade `tipo` (`app/src/components/mapa-paraiba.tsx:27-37`):
+O estilo é decidido por *feature*, pela propriedade `tipo` (`app/src/components/mapa-paraiba.tsx:35-47`):
 
 | Tipo | Traço | Preenchimento |
 |---|---|---|
-| `estado` | azul (`#1d4ed8`), espessura 2 | nenhum |
-| `municipio` | cinza (`#64748b`), espessura 1 | nenhum |
+| `estado` | azul (`#1d4ed8`), espessura 2 | nenhum (`fill: false`) |
+| `municipio` | cinza (`#475569`), espessura 1 | azul claro `#93c5fd`, opacidade 0,45 |
 
-**A DEFINIR:** transformar isso em mapa coroplético — preencher cada município com uma cor conforme algum indicador de fiscalização — está registrado como intenção em comentário no código, mas **não é decisão tomada**. Não existe indicador definido para mapear em cor, nem escala de cor escolhida, nem dado plugado. Qual indicador vai colorir o mapa é pergunta em aberto.
+O contorno do estado é o único sem preenchimento. Isso é deliberado: se ele fosse preenchido, a mancha do estado ficaria por baixo ou por cima dos 223 municípios e alteraria a cor percebida de todos eles.
+
+## Preenchimento e interação de mouse nos municípios
+
+Acrescentados em 2026-09-08, depois dos contornos. Valem **apenas para as *features* de `tipo: "municipio"`**; a *feature* do estado é ignorada logo na entrada da função (`app/src/components/mapa-paraiba.tsx:53-55`).
+
+São duas cores, e as duas estão isoladas em constantes no topo do componente, em `app/src/components/mapa-paraiba.tsx:32-33`:
+
+| Constante | Valor | Quando aparece | Opacidade do preenchimento |
+|---|---|---|---|
+| `COR_MUNICIPIO` | `#93c5fd` (azul claro) | em repouso | 0,45 |
+| `COR_MUNICIPIO_HOVER` | `#2563eb` (azul escuro) | enquanto o mouse está sobre o município | 0,70 |
+
+A cor de repouso é aplicada pela função de estilo `estiloContorno`, que o `<GeoJSON>` chama uma vez por *feature*. A troca de cor no passar do mouse é aplicada por dois ouvintes de evento do Leaflet registrados em `onEachFeature` (`app/src/components/mapa-paraiba.tsx:49-71`): `mouseover` chama `setStyle` com a cor escura, `mouseout` devolve a cor clara. Não há estado do React envolvido na interação — o Leaflet altera o atributo `fill` do elemento SVG diretamente, o que evita re-renderizar 224 *features* a cada movimento do mouse.
+
+O rótulo com o nome do município vem de `layer.bindTooltip(feature.properties.nome, { sticky: true })` (`app/src/components/mapa-paraiba.tsx:57`). A opção `sticky` faz o rótulo acompanhar o cursor enquanto ele percorre o polígono, em vez de ficar ancorado no centro geométrico da área — comportamento mais previsível em municípios de formato alongado ou côncavo, onde o centro geométrico pode cair fora da área visível.
+
+**A DEFINIR:** transformar isso em mapa coroplético — preencher cada município com uma cor conforme algum indicador de fiscalização — está registrado como intenção em comentário no código (`app/src/components/mapa-paraiba.tsx:27-31`), mas **não é decisão tomada**. Não existe indicador definido para mapear em cor, nem escala de cor escolhida, nem dado plugado. Qual indicador vai colorir o mapa é pergunta em aberto. O que a anotação registra é que, quando isso acontecer, muda a paleta de cores — a mecânica de `mouseover`/`mouseout` e o rótulo continuam como estão.
 
 ## Verificação feita em 2026-09-08
 
@@ -148,5 +165,9 @@ O estilo é decidido por *feature*, pela propriedade `tipo` (`app/src/components
 | Teste visual no navegador | mapa carrega, com zoom e deslocamento funcionais, mostrando a Paraíba enquadrada e um pouco dos estados vizinhos nas bordas |
 | Teste visual no navegador (Chrome), após os contornos | contorno do estado e dos 223 municípios desenhados corretamente sobre as imagens de fundo, com a atribuição "OpenStreetMap — contornos: IBGE" visível |
 | `pnpm geo:baixar` | executado; gravou 224 *features* em `app/public/geo/paraiba-municipios.geojson`, 215.739 bytes, sem disparar nenhuma das verificações de falha |
+| `pnpm typecheck` e `pnpm build`, após o preenchimento e o hover | ambos sem erro |
+| Preenchimento, troca de cor e rótulo no navegador | confirmados: o atributo `fill` do polígono muda para `#2563eb` no `mouseover` e o rótulo aparece com o nome do município |
+
+**Nota sobre como o hover foi verificado.** A confirmação foi feita disparando o evento `mouseover` diretamente sobre o elemento SVG do município, por JavaScript executado no console da página, e não pela simulação de movimento de mouse da ferramenta de automação de navegador. A simulação de automação não produz um evento `mouseover` nativo sobre os elementos SVG que o Leaflet desenha, então ela não aciona os ouvintes registrados em `onEachFeature`. Isso é uma limitação do método de teste, não do produto: com mouse real, o comportamento é o descrito acima. Quem for escrever teste automatizado desta tela precisa saber disso — verificar hover no mapa exige disparar o evento no DOM.
 
 Não há teste automatizado sobre esta tela — não há infraestrutura de teste no projeto.
