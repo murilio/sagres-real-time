@@ -30,7 +30,7 @@
 |---|---|---|
 | [`referencia/layout-csv-sagres.md`](referencia/layout-csv-sagres.md) | cabeçalho exato de cada dataset por faixa de anos, e as armadilhas de parsing do conteúdo | quem for escrever o parser de ingestão e o contrato de layout |
 | [`referencia/dimensao-municipios.md`](referencia/dimensao-municipios.md) | colunas, restrições e garantias de conteúdo da tabela `municipios`, e como repopulá-la | quem for consultar ou referenciar a dimensão por chave estrangeira |
-| [`referencia/tela-mapa-paraiba.md`](referencia/tela-mapa-paraiba.md) | a stack de mapa da tela inicial, o enquadramento fixo no estado e a restrição de `ssr: false` no App Router | quem for mexer no mapa, plugar dados nele ou criar a próxima tela |
+| [`referencia/tela-mapa-paraiba.md`](referencia/tela-mapa-paraiba.md) | a stack de mapa da tela inicial, o enquadramento fixo no estado, a restrição de `ssr: false` no App Router, e os contornos do estado e dos 223 municípios: fonte no IBGE, estrutura do GeoJSON e como regerá-lo | quem for mexer no mapa, plugar dados nele ou criar a próxima tela |
 
 ## Operação — o que fazer quando quebra
 

@@ -126,13 +126,17 @@ app/
     db.ts                 client Prisma — único ponto que instancia PrismaClient
     generated/prisma/     saída do `prisma generate`, não versionada
     seed/municipios.ts    seed da dimensão `municipios`
+    scripts/              scripts de execução única, fora do runtime
+      baixar-contornos-municipios.ts
     components/           componentes de tela
       mapa-paraiba.tsx  mapa-paraiba-loader.tsx
   app/                    App Router
     layout.tsx  page.tsx  globals.css
+  public/geo/             assets estáticos gerados e versionados
+    paraiba-municipios.geojson
 ```
 
-Isso é o estado atual, não um layout-alvo: o que existe é o banco com a dimensão `municipios` (contrato em [`referencia/dimensao-municipios.md`](referencia/dimensao-municipios.md)) e a tela inicial do painel com o mapa da Paraíba, ainda sem dado plugado (contrato em [`referencia/tela-mapa-paraiba.md`](referencia/tela-mapa-paraiba.md)). **Ainda não existem** a Route Handler de ingestão, o motor de regras nem qualquer teste automatizado.
+Isso é o estado atual, não um layout-alvo: o que existe é o banco com a dimensão `municipios` (contrato em [`referencia/dimensao-municipios.md`](referencia/dimensao-municipios.md)) e a tela inicial do painel com o mapa da Paraíba e os contornos do estado e dos 223 municípios, ainda sem dado do banco plugado (contrato em [`referencia/tela-mapa-paraiba.md`](referencia/tela-mapa-paraiba.md)). **Ainda não existem** a Route Handler de ingestão, o motor de regras nem qualquer teste automatizado.
 
 Como o código cresce dentro do app único — onde ficam parsers de CSV, contratos de layout, tipos compartilhados e regras de negócio, hoje sem fronteira imposta pelo gerenciador de pacotes — é **A DEFINIR**. A convenção de diretórios ainda não foi decidida.
 
@@ -274,6 +278,8 @@ Server Components lendo o banco pelo client de `app/src/db.ts` ou consumindo as 
 
 **Implementado em 2026-09-08:** a tela inicial existe e mostra um mapa base do estado da Paraíba, em Leaflet com `react-leaflet` e imagens de fundo do OpenStreetMap. É só o mapa — não há contorno de município desenhado, nenhum dado do banco plugado e nenhum dos itens de conteúdo da Home listados acima (ranking de risco, feed de alertas, totais do estado). A escolha da biblioteca de mapa, a decisão de enquadrar por caixa delimitadora fixa em vez de ponto central com zoom, e a restrição do App Router que obriga o mapa a ser carregado por um Client Component intermediário estão em [`referencia/tela-mapa-paraiba.md`](referencia/tela-mapa-paraiba.md).
 
+**Incremento em 2026-09-08:** o mapa ganhou o contorno do estado e o contorno de cada um dos 223 municípios, desenhados como camada `GeoJSON` sobre as imagens de fundo. Os polígonos vêm da API de Malhas Territoriais do IBGE, baixados por um script de execução única (`pnpm geo:baixar`) e gravados como asset estático versionado em `app/public/geo/paraiba-municipios.geojson`; cada município carrega o `codigo_tce`, que é a chave de junção com a tabela `municipios`. Continua **sem nenhum dado do banco plugado** e sem os itens de conteúdo da Home listados acima. A fonte escolhida, o motivo de o Nominatim ter sido descartado, o casamento por nome com a semente do TCE-PB e a estrutura do arquivo estão em [`referencia/tela-mapa-paraiba.md`](referencia/tela-mapa-paraiba.md).
+
 ---
 
 ## 8. Roadmap
@@ -284,7 +290,7 @@ Server Components lendo o banco pelo client de `app/src/db.ts` ou consumindo as 
 
 **Fase 2 — Painel (2 semanas).** Telas de município, fornecedor e licitação. Busca global. Exportação.
 
-> Iniciada fora de ordem em 2026-09-08, antes das fases 0 e 1: a tela inicial ganhou o mapa base da Paraíba, sem dado nenhum plugado — ver seção 7 e [`referencia/tela-mapa-paraiba.md`](referencia/tela-mapa-paraiba.md). Nenhum outro item desta fase foi feito.
+> Iniciada fora de ordem em 2026-09-08, antes das fases 0 e 1: a tela inicial ganhou o mapa base da Paraíba e, no mesmo dia, o contorno do estado e dos 223 municípios a partir da malha do IBGE — ainda sem nenhum dado do banco plugado. Ver seção 7 e [`referencia/tela-mapa-paraiba.md`](referencia/tela-mapa-paraiba.md). Nenhum outro item desta fase foi feito.
 
 **Fase 3 — Fiscalização (2 a 3 semanas).** Motor de regras, tabela de alertas, score de risco, watchlist e notificação por e-mail. É aqui que o produto deixa de ser um espelho do portal do TCE.
 
