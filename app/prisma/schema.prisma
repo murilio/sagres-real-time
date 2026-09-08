@@ -1,0 +1,103 @@
+// Schema do SAGRES Real Time.
+// Unica fonte do schema, das migracoes e do client Prisma da aplicacao
+// (docs/adr/ADR-0004-nextjs-unico.md).
+//
+// AVISO: parte do banco
+// nao e gerada por este arquivo. Particionamento por ano de `empenhos` e
+// `folha_mensal`, materialized views de agregacao e indices GIN de
+// pg_trgm sao criados por SQL escrito a mao dentro das migracoes. Este
+// schema descreve essas estruturas para efeito de tipagem, mas nao as
+// cria. Reconstruir o banco a partir daqui (`prisma db push`,
+// `migrate reset` sem as migracoes SQL) produz um banco incompleto.
+//
+// Primeiro model: `Municipio` (dimensao fechada de 223 linhas). As
+// tabelas de fato entram nas fases seguintes.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+
+  // Emite CommonJS: e o formato que o runtime do Next.js consome sem
+  // configuracao extra de ESM em Route Handlers e Server Components.
+  moduleFormat = "cjs"
+  runtime      = "nodejs"
+}
+
+// A partir do Prisma 7 o bloco datasource nao aceita mais `url`.
+// A URL de migracao/introspeccao vive em prisma.config.ts e a conexao de
+// runtime entra pelo driver adapter passado ao PrismaClient (src/index.ts).
+datasource db {
+  provider = "postgresql"
+}
+
+/// Municipios da Paraiba, conforme o codigo usado pelo TCE-PB.
+///
+/// Dimensao fechada: 223 linhas, uma por municipio, codigos 001..223
+/// contiguos (verificado varrendo as 16.502 chaves da listagem S3 do
+/// bucket de dados abertos em 2026-09-08). Populada por
+/// `src/seed/municipios.ts` a partir de `prisma/seed/municipios-tce-pb.csv`,
+/// que e versionado justamente porque este dado nao e publicado pelo
+/// TCE-PB como tabela de referencia — foi derivado dos datasets.
+model Municipio {
+  /// Codigo do municipio no TCE-PB, 3 digitos com zero a esquerda.
+  ///
+  /// Chave primaria natural, nao id sintetico. Razao: este codigo e o
+  /// segmento de caminho da URL da fonte
+  /// (`dados-por-municipio/001/despesas/despesas-2026.zip`) e os 3
+  /// ultimos digitos de `codigo_unidade_gestora` sao exatamente ele, sem
+  /// excecao nas UGs dos 223 municipios. A FK das tabelas de fato sai
+  /// direto do parse da linha bruta, por substring, sem consultar esta
+  /// tabela linha a linha. Com id sintetico, cada uma das dezenas de
+  /// milhoes de linhas ingeridas exigiria um lookup para resolver a FK.
+  ///
+  /// `Char(3)`, nao inteiro: o zero a esquerda e significativo para
+  /// montar a URL da fonte. Com `smallint` a formatacao
+  /// (`padStart(3, "0")`) teria de ser repetida em todo ponto que monta
+  /// URL ou compara com o dado bruto, e um esquecimento vira 404
+  /// silencioso na coleta. A migracao acrescenta um CHECK `^[0-9]{3}$`,
+  /// que o schema Prisma nao sabe expressar.
+  codigoTce String @id @map("codigo_tce") @db.Char(3)
+
+  /// Nome oficial como aparece nos datasets, em NFC, acentuacao intacta.
+  ///
+  /// Unico: zero nomes repetidos entre os 223 (verificado). Um segundo
+  /// municipio com o mesmo nome seria erro de dado ou de parser, e falhar
+  /// alto e melhor que duplicar a dimensao em silencio.
+  nome String @unique @map("nome") @db.VarChar(120)
+
+  /// Nome sem diacritico e em caixa alta (`SAO SEBASTIAO DE LAGOA DE ROCA`).
+  ///
+  /// Existe por dois consumidores reais, nao por simetria:
+  /// (1) a busca por nome no painel — o banco usa locale `C`, entao
+  /// `ILIKE '%agua%'` nao encontra `Agua Branca` sem esta coluna;
+  /// (2) o casamento do `nome_municipio` que vem nos CSVs de despesas,
+  /// licitacoes, receitas e servidores contra esta dimensao — a coleta
+  /// achou 3 municipios cujo nome diverge entre datasets, e a divergencia
+  /// e de acentuacao.
+  /// Unico tambem: 0 colisoes apos normalizar os 223 (verificado).
+  ///
+  /// Sem indice de trigrama (`pg_trgm`): 223 linhas cabem em uma pagina,
+  /// o seq scan e mais barato que o indice. Se esta tabela virar origem
+  /// de busca combinada com fornecedores, o indice entra la, nao aqui.
+  nomeNormalizado String @unique @map("nome_normalizado") @db.VarChar(120)
+
+  /// Quando a linha entrou. Nao muda em recarga.
+  criadoEm DateTime @default(now()) @map("criado_em") @db.Timestamptz(3)
+
+  /// Quando o conteudo da linha mudou pela ultima vez.
+  ///
+  /// So avanca quando algum campo de fato mudou: o seed usa
+  /// `ON CONFLICT DO UPDATE ... WHERE ... IS DISTINCT FROM`. Um seed que
+  /// carimbasse `now()` em toda execucao tornaria esta coluna inutil para
+  /// responder "quando o municipio 106 mudou de nome".
+  atualizadoEm DateTime @updatedAt @map("atualizado_em") @db.Timestamptz(3)
+
+  @@map("municipios")
+}
+
+// Ausente de proposito: `codigo_ibge`. O codigo IBGE nao aparece em
+// nenhum dataset do bucket e o TCE-PB nao publica tabela de-para (a
+// coleta varreu o bucket inteiro). Coluna nula permanente e divida que
+// alguem popula pela metade; em uma tabela de 223 linhas, um
+// `ALTER TABLE ADD COLUMN` no dia em que houver a fonte custa
+// milissegundos. Pendencia registrada, nao coluna morta.

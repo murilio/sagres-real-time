@@ -1,0 +1,36 @@
+# Dependencias
+node_modules/
+.pnpm-store/
+
+# Build
+dist/
+build/
+*.tsbuildinfo
+.next/
+out/
+
+# Client gerado pelo Prisma (derivado do schema, nao versionado)
+app/src/generated/
+
+# Ambiente — .env.example e versionado, .env real nao
+.env
+.env.*
+!.env.example
+
+# Dados locais do Postgres, caso o volume vire bind mount
+.docker-data/
+
+# Artefatos de ingestao baixados do TCE-PB
+tmp/
+*.zip
+
+# Editor / SO
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Logs e cobertura
+*.log
+npm-debug.log*
+coverage/

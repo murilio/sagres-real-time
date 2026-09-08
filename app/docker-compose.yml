@@ -1,0 +1,43 @@
+# Nome do projeto fixado: sem isso o compose deriva do nome do diretorio
+# (hoje "app"), e mover a pasta renomearia rede e containers.
+name: sagres-real-time
+
+# Postgres local de desenvolvimento.
+# PostgreSQL 16 conforme docs/adr/ADR-0001-nextjs-nestjs-prisma.md e
+# docs/plano.md secao 2 (Infraestrutura). Tag com patch fixo: "16-alpine"
+# muda debaixo do pe e faz o ambiente de um dev divergir do outro.
+#
+# Redis (filas BullMQ) ainda nao esta aqui — nao ha worker no repositorio.
+
+services:
+  postgres:
+    image: postgres:16.10-alpine
+    container_name: sagres-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?defina POSTGRES_USER no .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env}
+      POSTGRES_DB: ${POSTGRES_DB:?defina POSTGRES_DB no .env}
+      # Locale C com encoding UTF8. O dado do TCE-PB e UTF-8 com BOM e as
+      # chaves de negocio sao normalizadas em uppercase na ingestao
+      # (docs/plano.md secao 3, passo 2). Ordenacao por locale pt_BR
+      # tornaria o resultado de indice e de ORDER BY dependente da versao
+      # da libc da imagem; "C" e estavel e deterministico.
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    ports:
+      # Publicado so em 127.0.0.1: banco de dev nao vai para a rede local.
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      # Quem depende do banco (migracao, teste de integracao) espera por
+      # este healthcheck em vez de dormir um tempo arbitrario.
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  postgres-data:
+    name: sagres-postgres-data
