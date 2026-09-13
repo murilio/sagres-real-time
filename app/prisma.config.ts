@@ -19,7 +19,12 @@ export default defineConfig({
   datasource: {
     // Usada apenas pelo CLI (migrate, introspect, studio). O runtime da
     // aplicacao nao passa por aqui: conecta pelo adapter em src/db.ts.
-    url: env("DATABASE_URL"),
+    //
+    // DIRECT_URL (conexao direta, porta 5432) e obrigatoria aqui quando
+    // DATABASE_URL aponta para um pooler em modo transaction (Supabase
+    // pgbouncer, porta 6543): esse modo nao suporta os advisory locks e
+    // DDL que `prisma migrate` precisa.
+    url: env("DIRECT_URL"),
   },
 
   migrations: {
